@@ -57,7 +57,7 @@ pub fn process_instruction(
     let account_info_iter = &mut accounts.iter();
 
     let initializer = next_account_info(account_info_iter)?;
-    let pda_account = next_account_info(account_info_iter)?;
+    let user_account = next_account_info(account_info_iter)?;
     let system_program = next_account_info(account_info_iter)?;
 
     if !initializer.is_signer {
@@ -66,7 +66,7 @@ pub fn process_instruction(
     }
         
     let (pda, bump_seed) = Pubkey::find_program_address(&[initializer.key.as_ref(), title.as_bytes().as_ref(),], program_id);
-    if pda != *pda_account.key {
+    if pda != *user_account.key {
         msg!("Invalid seeds for PDA");
         return Err(ProgramError::InvalidArgument.into())
     }
@@ -79,19 +79,19 @@ pub fn process_instruction(
     invoke_signed(
       &system_instruction::create_account(
         initializer.key,
-        pda_account.key,
+        user_account.key,
         rent_lamports,
         account_len.try_into().unwrap(),
         program_id,
       ),
-      &[initializer.clone(), pda_account.clone(), system_program.clone()],
+      &[initializer.clone(), user_account.clone(), system_program.clone()],
       &[&[initializer.key.as_ref(), title.as_bytes().as_ref(), &[bump_seed]]],
     )?;
 
     msg!("PDA created: {}", pda);
 
     msg!("unpacking state account");
-    let mut account_data = try_from_slice_unchecked::<MovieAccountState>(&pda_account.data.borrow()).unwrap();
+    let mut account_data = try_from_slice_unchecked::<MovieAccountState>(&user_account.data.borrow()).unwrap();
     msg!("borrowed account data");
 
     account_data.title = title;
@@ -100,7 +100,7 @@ pub fn process_instruction(
     account_data.is_initialized = true;
 
     msg!("serializing account");
-    account_data.serialize(&mut &mut pda_account.data.borrow_mut()[..])?;
+    account_data.serialize(&mut &mut user_account.data.borrow_mut()[..])?;
     msg!("state account serialized");
 
     Ok(())
@@ -127,12 +127,13 @@ pub fn process_instruction(
         msg!("Data length is larger than 1000 bytes");
         return Err(ReviewError::InvalidDataLength.into())
     }
-    
+
+    // test
     let account_info_iter = &mut accounts.iter();
 
     let initializer = next_account_info(account_info_iter)?;
-    let pda_account = next_account_info(account_info_iter)?;
-    if pda_account.owner != program_id {
+    let user_account = next_account_info(account_info_iter)?;
+    if user_account.owner != program_id {
         return Err(ProgramError::IllegalOwner)
     }      
 
@@ -142,11 +143,11 @@ pub fn process_instruction(
     }
         
     msg!("unpacking state account");
-    let mut account_data = try_from_slice_unchecked::<MovieAccountState>(&pda_account.data.borrow()).unwrap();
+    let mut account_data = try_from_slice_unchecked::<MovieAccountState>(&user_account.data.borrow()).unwrap();
     msg!("borrowed account data");
 
     let (pda, bump_seed) = Pubkey::find_program_address(&[initializer.key.as_ref(), account_data.title.as_bytes().as_ref(),], program_id);
-    if pda != *pda_account.key {
+    if pda != *user_account.key {
         msg!("Invalid seeds for PDA");
         return Err(ProgramError::InvalidArgument.into())
     }
@@ -167,7 +168,7 @@ pub fn process_instruction(
     account_data.description = description;
 
     msg!("serializing account");
-    account_data.serialize(&mut &mut pda_account.data.borrow_mut()[..])?;
+    account_data.serialize(&mut &mut user_account.data.borrow_mut()[..])?;
     msg!("state account serialized");
 
     Ok(())
